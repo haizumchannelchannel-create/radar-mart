@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RADAR MART - Pencatatan Keuangan</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js untuk Grafik -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Firebase v8 SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <style>
+    @media print {
+      body * { visibility: hidden; }
+      #laporan-cetak, #laporan-cetak * { visibility: visible; }
+      #laporan-cetak { 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100%; 
+        padding: 0;
+        margin: 0;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 1.5cm;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen relative">
+
+  <!-- POPUP NOTIFIKASI INSTAN (TOAST) -->
+  <div id="toast-notif" class="fixed top-5 right-5 z-50 hidden flex items-center p-4 mb-4 text-white bg-green-600 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-0">
+    <div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-green-200 bg-green-800 rounded-lg mr-3">
+      ✓
+    </div>
+    <div class="text-sm font-bold pr-2" id="toast-message">Data Transaksi Berhasil Disimpan!</div>
+  </div>
+
+  <!-- PAGE LOGIN -->
+  <div id="page-login" class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100 text-center">
+      
+      <!-- LOGO RADAR MART (.jpeg) -->
+      <div class="mb-4 flex justify-center">
+        <img src="logo.jpeg" alt="Logo RADAR MART" class="h-24 w-auto object-contain drop-shadow-md">
+      </div>
+
+      <h1 class="text-2xl font-extrabold text-gray-800">RADAR MART</h1>
+      <p class="text-xs text-blue-600 font-semibold tracking-widest uppercase mb-6">Murah & Berkah</p>
+      
+      <form id="form-login" onsubmit="handleLogin(event)" class="space-y-4 text-left">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Email Login</label>
+          <input type="email" id="login-email" required placeholder="kasir@radarmart.com" class="mt-1 w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Password</label>
+          <input type="password" id="login-password" required placeholder="••••••••" class="mt-1 w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none">
+        </div>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg transition duration-200">
+          Masuk / Login
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- APP UTAMA -->
+  <div id="app-main" class="hidden min-h-screen flex flex-col">
+    <!-- Navbar -->
+    <header class="bg-blue-600 text-white shadow-md">
+      <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <img src="logo.jpeg" alt="Logo RADAR MART" class="h-10 w-auto rounded bg-white p-1">
+          <div>
+            <h1 class="text-xl font-bold">RADAR MART <span class="text-xs font-normal bg-blue-700 px-2 py-1 rounded">Murah & Berkah</span></h1>
+            <p class="text-xs text-blue-100">User Active: <span id="user-display" class="font-semibold"></span></p>
+          </div>
+        </div>
+        <button onclick="handleLogout()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">
+          Keluar
+        </button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white border-b shadow-sm">
+      <div class="max-w-7xl mx-auto px-4 flex gap-4 overflow-x-auto">
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="py-3 px-4 font-bold border-b-2 border-blue-600 text-blue-600 whitespace-nowrap">Dashboard</button>
+        <button onclick="switchTab('input')" id="tab-input" class="py-3 px-4 font-bold border-b-2 border-transparent text-gray-500 whitespace-nowrap">Input Keuangan</button>
+        <button onclick="switchTab('rekap')" id="tab-rekap" class="py-3 px-4 font-bold border-b-2 border-transparent text-gray-500 whitespace-nowrap">Rekap Data</button>
+      </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+      <!-- DASHBOARD TAB -->
+      <section id="view-dashboard" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-green-500">
+            <p class="text-gray-500 text-sm font-bold">Total Pemasukan</p>
+            <h2 id="stat-pemasukan" class="text-2xl font-bold text-green-600">Rp 0</h2>
+          </div>
+          <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-red-500">
+            <p class="text-gray-500 text-sm font-bold">Total Pengeluaran</p>
+            <h2 id="stat-pengeluaran" class="text-2xl font-bold text-red-600">Rp 0</h2>
+          </div>
+          <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-yellow-500">
+            <p class="text-gray-500 text-sm font-bold">Total Hutang</p>
+            <h2 id="stat-hutang" class="text-2xl font-bold text-yellow-600">Rp 0</h2>
+          </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm">
+          <h3 class="font-bold text-gray-800 mb-4">Statistik Keuangan</h3>
+          <canvas id="financeChart" class="max-h-64"></canvas>
+        </div>
+      </section>
+
+      <!-- INPUT TAB -->
+      <section id="view-input" class="hidden max-w-2xl mx-auto bg-white p-6 rounded-2xl shadow-sm border">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Form Input Keuangan</h2>
+        <form id="form-transaksi" onsubmit="saveTransaction(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Tanggal & Waktu</label>
+              <input type="text" id="input-datetime" readonly class="mt-1 w-full p-3 bg-gray-100 border rounded-xl text-gray-600 font-semibold">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Nama User / Penjaga</label>
+              <input type="text" id="input-user" readonly class="mt-1 w-full p-3 bg-gray-100 border rounded-xl text-gray-600 font-semibold">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Pilih Shift Kerja</label>
+              <select id="input-shift" required class="mt-1 w-full p-3 border rounded-xl">
+                <option value="Shift Pagi">Shift Pagi</option>
+                <option value="Shift Sore">Shift Sore</option>
+                <option value="Shift Malam">Shift Malam</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Jenis Transaksi</label>
+              <select id="input-jenis" required class="mt-1 w-full p-3 border rounded-xl">
+                <option value="pemasukan">Pemasukan (+)</option>
+                <option value="pengeluaran">Pengeluaran (-)</option>
+                <option value="hutang">Hutang (!)</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Nominal (Rp)</label>
+            <input type="number" id="input-nominal" required placeholder="Contoh: 50000" class="mt-1 w-full p-3 border rounded-xl">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Keterangan / Keperluan</label>
+            <textarea id="input-keterangan" required placeholder="Catatan transaksi..." class="mt-1 w-full p-3 border rounded-xl rows-3"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-700">Foto Nota / Bukti</label>
+            <input type="file" id="input-foto" accept="image/*" class="mt-1 w-full p-2 border rounded-xl">
+          </div>
+
+          <button type="submit" id="btn-submit-transaksi" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow transition duration-200">
+            Simpan Transaksi
+          </button>
+        </form>
+      </section>
+
+      <!-- REKAP TAB -->
+      <section id="view-rekap" class="hidden space-y-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border flex flex-wrap gap-4 items-end">
+          <div>
+            <label class="block text-xs font-bold text-gray-600">Dari Tanggal</label>
+            <input type="date" id="filter-start" class="p-2 border rounded-lg text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-600">Sampai Tanggal</label>
+            <input type="date" id="filter-end" class="p-2 border rounded-lg text-sm">
+          </div>
+          <button onclick="renderTable()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Filter</button>
+          <button onclick="cetakLaporanSuratResmi()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
+            🖨️ Cetak Laporan Resmi
+          </button>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border overflow-x-auto">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="p-3">Waktu</th>
+                <th class="p-3">Kasir/User</th>
+                <th class="p-3">Shift</th>
+                <th class="p-3">Jenis</th>
+                <th class="p-3">Nominal</th>
+                <th class="p-3">Keterangan</th>
+                <th class="p-3">Nota</th>
+                <th class="p-3">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- MODAL BUKTI NOTA -->
+  <div id="modal-nota" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-2xl p-4 max-w-lg w-full relative space-y-3">
+      <div class="flex justify-between items-center border-b pb-2">
+        <h3 class="font-bold text-gray-800">Bukti Nota / Foto</h3>
+        <button onclick="closeNotaModal()" class="text-gray-500 hover:text-black font-bold text-xl px-2">&times;</button>
+      </div>
+      <div class="flex justify-center bg-gray-100 rounded-xl overflow-hidden max-h-[70vh]">
+        <img id="modal-nota-img" src="" alt="Bukti Nota" class="object-contain max-h-[65vh]">
+      </div>
+      <button onclick="closeNotaModal()" class="w-full bg-gray-800 text-white py-2 rounded-xl text-sm font-semibold">Tutup</button>
+    </div>
+  </div>
+
+  <!-- AREA CETAK SURAT RESMI (A4) -->
+  <div id="laporan-cetak" class="hidden bg-white text-black p-8 max-w-4xl mx-auto">
+    
+    <!-- KOP SURAT RESMI -->
+    <div class="flex items-center justify-between border-b-4 border-black pb-4 mb-6">
+      <img src="logo.jpeg" alt="Logo RADAR MART" class="h-20 w-auto object-contain">
+      <div class="text-center flex-1 px-4">
+        <h1 class="text-3xl font-extrabold tracking-wide uppercase">RADAR MART</h1>
+        <p class="text-sm font-bold text-gray-700 uppercase tracking-widest">Murah & Berkah</p>
+        <p class="text-xs text-gray-600 mt-1">Jl. Raya Langkap, Duur, Burneh, Kec. Burneh, Kabupaten Bangkalan, Jawa Timur 69121</p>
+      </div>
+      <div class="w-20"></div>
+    </div>
+
+    <!-- JUDUL LAPORAN & INFORMASI PERIODE -->
+    <div class="text-center mb-6">
+      <h2 class="text-xl font-bold underline uppercase tracking-wider">LAPORAN REKAPITULASI KEUANGAN</h2>
+      <p class="text-xs text-gray-600 mt-1">Periode Transaksi: <span id="surat-periode" class="font-semibold"></span></p>
+      <p class="text-xs text-gray-600">Dicetak Pada: <span id="surat-tgl-cetak" class="font-semibold"></span></p>
+    </div>
+
+    <!-- TABEL RINGKASAN TOTAL -->
+    <div class="grid grid-cols-3 gap-4 mb-6 text-xs text-center font-bold">
+      <div class="border border-green-600 p-2 rounded bg-green-50">
+        Total Pemasukan: <br><span id="surat-tot-masuk" class="text-sm text-green-700">Rp 0</span>
+      </div>
+      <div class="border border-red-600 p-2 rounded bg-red-50">
+        Total Pengeluaran: <br><span id="surat-tot-keluar" class="text-sm text-red-700">Rp 0</span>
+      </div>
+      <div class="border border-yellow-600 p-2 rounded bg-yellow-50">
+        Total Hutang: <br><span id="surat-tot-hutang" class="text-sm text-yellow-700">Rp 0</span>
+      </div>
+    </div>
+
+    <!-- TABEL DETAIL TRANSAKSI -->
+    <table class="w-full text-xs text-left border-collapse border border-gray-400 mb-8">
+      <thead>
+        <tr class="bg-gray-200 border-b border-gray-400 text-gray-800">
+          <th class="border border-gray-400 p-2 text-center w-8">No</th>
+          <th class="border border-gray-400 p-2">Waktu Transaksi</th>
+          <th class="border border-gray-400 p-2">Kasir / User</th>
+          <th class="border border-gray-400 p-2 text-center">Shift</th>
+          <th class="border border-gray-400 p-2">Keterangan / Keperluan</th>
+          <th class="border border-gray-400 p-2 text-center">Jenis</th>
+          <th class="border border-gray-400 p-2 text-right">Nominal</th>
+        </tr>
+      </thead>
+      <tbody id="surat-items"></tbody>
+    </table>
+
+    <!-- TANDA TANGAN PENANGGUNG JAWAB -->
+    <div class="flex justify-between items-end mt-12 text-xs">
+      <div class="text-center w-48">
+        <p>Petugas Kasir,</p>
+        <div class="h-16"></div>
+        <p class="font-bold underline" id="surat-kasir-ttd">( ............................ )</p>
+      </div>
+      <div class="text-center w-48">
+        <p>Bangkalan, <span id="surat-ttd-tgl"></span></p>
+        <p>Mengetahui, Pemilik Store</p>
+        <div class="h-16"></div>
+        <p class="font-bold underline">( RADAR MART )</p>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Konfigurasi Firebase RADAR MART
+    const firebaseConfig = {
+      apiKey: "AIzaSyC9HAM8_ngWtpBcORwLKQDh5BjfIEnACWM",
+      authDomain: "radar-mart-keuangan.firebaseapp.com",
+      projectId: "radar-mart-keuangan",
+      storageBucket: "radar-mart-keuangan.firebasestorage.app",
+      messagingSenderId: "262082508271",
+      appId: "1:262082508271:web:b3bae2891b2be80f40721a"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    let currentUser = null;
+    let transactions = [];
+    let myChart = null;
+
+    setInterval(() => {
+      const now = new Date();
+      document.getElementById('input-datetime').value = now.toLocaleString('id-ID');
+    }, 1000);
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-notif');
+      document.getElementById('toast-message').innerText = msg;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 3000);
+    }
+
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        currentUser = user;
+        document.getElementById('page-login').classList.add('hidden');
+        document.getElementById('app-main').classList.remove('hidden');
+        document.getElementById('user-display').innerText = user.email;
+        document.getElementById('input-user').value = user.email.split('@')[0];
+        loadData();
+      } else {
+        document.getElementById('page-login').classList.remove('hidden');
+        document.getElementById('app-main').classList.add('hidden');
+      }
+    });
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const pass = document.getElementById('login-password').value;
+      auth.signInWithEmailAndPassword(email, pass).catch(err => alert("Login gagal: " + err.message));
+    }
+
+    function handleLogout() {
+      auth.signOut();
+    }
+
+    function switchTab(tab) {
+      ['dashboard', 'input', 'rekap'].forEach(t => {
+        document.getElementById(`view-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).classList.remove('border-blue-600', 'text-blue-600');
+        document.getElementById(`tab-${t}`).classList.add('border-transparent', 'text-gray-500');
+      });
+      document.getElementById(`view-${tab}`).classList.remove('hidden');
+      document.getElementById(`tab-${tab}`).classList.add('border-blue-600', 'text-blue-600');
+    }
+
+    async function saveTransaction(e) {
+      e.preventDefault();
+      
+      const submitBtn = document.getElementById('btn-submit-transaksi');
+      submitBtn.disabled = true;
+      submitBtn.innerText = "⏳ Menyimpan...";
+
+      try {
+        const shift = document.getElementById('input-shift').value;
+        const jenis = document.getElementById('input-jenis').value;
+        const nominal = parseFloat(document.getElementById('input-nominal').value);
+        const keterangan = document.getElementById('input-keterangan').value;
+        const user = document.getElementById('input-user').value;
+        const fileInput = document.getElementById('input-foto');
+
+        let photoData = "";
+        if (fileInput.files[0]) {
+          photoData = await convertBase64Fast(fileInput.files[0]);
+        }
+
+        await db.collection("transactions").add({
+          date: new Date().toISOString(),
+          user, shift, jenis, nominal, keterangan, photoData
+        });
+
+        // NOTIFIKASI TOAST INSTAN
+        showToast("✅ Transaksi Berhasil Disimpan!");
+        
+        document.getElementById('form-transaksi').reset();
+        switchTab('rekap');
+        loadData();
+
+      } catch (error) {
+        alert("❌ Gagal menyimpan: " + error.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "Simpan Transaksi";
+      }
+    }
+
+    // Kompresi Gambar Cepat Ringan
+    function convertBase64Fast(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        const img = new Image();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+          img.src = event.target.result;
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 500; // Ukuran diperkecil agar sangat ringan
+            const scale = MAX_WIDTH / img.width;
+            canvas.width = (img.width > MAX_WIDTH) ? MAX_WIDTH : img.width;
+            canvas.height = (img.width > MAX_WIDTH) ? img.height * scale : img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', 0.5));
+          };
+        };
+      });
+    }
+
+    function loadData() {
+      db.collection("transactions").orderBy("date", "desc").onSnapshot(snapshot => {
+        transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderStats();
+        renderTable();
+      });
+    }
+
+    function renderStats() {
+      let masuk = 0, keluar = 0, hutang = 0;
+      transactions.forEach(t => {
+        if (t.jenis === 'pemasukan') masuk += t.nominal;
+        if (t.jenis === 'pengeluaran') keluar += t.nominal;
+        if (t.jenis === 'hutang') hutang += t.nominal;
+      });
+
+      document.getElementById('stat-pemasukan').innerText = `Rp ${masuk.toLocaleString('id-ID')}`;
+      document.getElementById('stat-pengeluaran').innerText = `Rp ${keluar.toLocaleString('id-ID')}`;
+      document.getElementById('stat-hutang').innerText = `Rp ${hutang.toLocaleString('id-ID')}`;
+
+      const ctx = document.getElementById('financeChart').getContext('2d');
+      if (myChart) myChart.destroy();
+      myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: ['Pemasukan', 'Pengeluaran', 'Hutang'],
+          datasets: [{
+            label: 'Total Nominal (Rp)',
+            data: [masuk, keluar, hutang],
+            backgroundColor: ['#10B981', '#EF4444', '#F59E0B']
+          }]
+        }
+      });
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('table-body');
+      tbody.innerHTML = "";
+
+      const start = document.getElementById('filter-start').value;
+      const end = document.getElementById('filter-end').value;
+
+      let filtered = transactions;
+      if (start && end) {
+        filtered = transactions.filter(t => {
+          const tDate = t.date.split('T')[0];
+          return tDate >= start && tDate <= end;
+        });
+      }
+
+      filtered.forEach(t => {
+        const tr = document.createElement('tr');
+        tr.className = "border-b hover:bg-gray-50";
+        tr.innerHTML = `
+          <td class="p-3">${new Date(t.date).toLocaleString('id-ID')}</td>
+          <td class="p-3 font-semibold">${t.user}</td>
+          <td class="p-3"><span class="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs font-bold">${t.shift || 'Shift Pagi'}</span></td>
+          <td class="p-3 uppercase text-xs font-bold ${t.jenis === 'pemasukan' ? 'text-green-600' : t.jenis === 'pengeluaran' ? 'text-red-600' : 'text-yellow-600'}">${t.jenis}</td>
+          <td class="p-3 font-bold">Rp ${t.nominal.toLocaleString('id-ID')}</td>
+          <td class="p-3">${t.keterangan}</td>
+          <td class="p-3">${t.photoData ? `<button onclick="viewNota('${t.id}')" class="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-blue-100">Lihat Nota</button>` : '-'}</td>
+          <td class="p-3">
+            <button onclick="deleteData('${t.id}')" class="text-red-500 font-bold hover:underline">Hapus</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function viewNota(id) {
+      const tx = transactions.find(t => t.id === id);
+      if (tx && tx.photoData) {
+        document.getElementById('modal-nota-img').src = tx.photoData;
+        document.getElementById('modal-nota').classList.remove('hidden');
+      }
+    }
+
+    function closeNotaModal() {
+      document.getElementById('modal-nota').classList.add('hidden');
+    }
+
+    async function deleteData(id) {
+      if (confirm("Yakin ingin menghapus data ini?")) {
+        await db.collection("transactions").doc(id).delete();
+        showToast("🗑️ Data Berhasil Dihapus");
+        loadData();
+      }
+    }
+
+    function cetakLaporanSuratResmi() {
+      const startVal = document.getElementById('filter-start').value;
+      const endVal = document.getElementById('filter-end').value;
+
+      const nowStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      document.getElementById('surat-tgl-cetak').innerText = nowStr;
+      document.getElementById('surat-ttd-tgl').innerText = nowStr;
+      document.getElementById('surat-periode').innerText = (startVal && endVal) ? `${startVal} s/d ${endVal}` : "Semua Periode Transaksi";
+      document.getElementById('surat-kasir-ttd').innerText = currentUser ? currentUser.email.split('@')[0] : "Kasir";
+
+      let filtered = transactions;
+      if (startVal && endVal) {
+        filtered = transactions.filter(t => {
+          const tDate = t.date.split('T')[0];
+          return tDate >= startVal && tDate <= endVal;
+        });
+      }
+
+      let totMasuk = 0, totKeluar = 0, totHutang = 0;
+      const itemsContainer = document.getElementById('surat-items');
+      itemsContainer.innerHTML = "";
+
+      filtered.forEach((t, index) => {
+        if (t.jenis === 'pemasukan') totMasuk += t.nominal;
+        if (t.jenis === 'pengeluaran') totKeluar += t.nominal;
+        if (t.jenis === 'hutang') totHutang += t.nominal;
+
+        const tr = document.createElement('tr');
+        tr.className = "border-b border-gray-300";
+
+        let labelJenis = "";
+        let classColor = "";
+        if (t.jenis === 'pemasukan') {
+          labelJenis = "PEMASUKAN";
+          classColor = "text-green-700 font-bold";
+        } else if (t.jenis === 'pengeluaran') {
+          labelJenis = "PENGELUARAN";
+          classColor = "text-red-700 font-bold";
+        } else {
+          labelJenis = "HUTANG";
+          classColor = "text-yellow-700 font-bold";
+        }
+
+        tr.innerHTML = `
+          <td class="border border-gray-300 p-2 text-center">${index + 1}</td>
+          <td class="border border-gray-300 p-2">${new Date(t.date).toLocaleString('id-ID')}</td>
+          <td class="border border-gray-300 p-2">${t.user}</td>
+          <td class="border border-gray-300 p-2 text-center">${t.shift || 'Shift Pagi'}</td>
+          <td class="border border-gray-300 p-2">${t.keterangan}</td>
+          <td class="border border-gray-300 p-2 text-center ${classColor}">${labelJenis}</td>
+          <td class="border border-gray-300 p-2 text-right font-bold">Rp ${t.nominal.toLocaleString('id-ID')}</td>
+        `;
+        itemsContainer.appendChild(tr);
+      });
+
+      document.getElementById('surat-tot-masuk').innerText = `Rp ${totMasuk.toLocaleString('id-ID')}`;
+      document.getElementById('surat-tot-keluar').innerText = `Rp ${totKeluar.toLocaleString('id-ID')}`;
+      document.getElementById('surat-tot-hutang').innerText = `Rp ${totHutang.toLocaleString('id-ID')}`;
+
+      document.getElementById('laporan-cetak').classList.remove('hidden');
+      window.print();
+      document.getElementById('laporan-cetak').classList.add('hidden');
+    }
+  </script>
+</body>
+</html>
