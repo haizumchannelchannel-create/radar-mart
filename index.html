@@ -33,12 +33,10 @@
 </head>
 <body class="bg-gray-100 font-sans min-h-screen relative">
 
-  <!-- POPUP NOTIFIKASI INSTAN (TOAST) -->
-  <div id="toast-notif" class="fixed top-5 right-5 z-50 hidden flex items-center p-4 mb-4 text-white bg-green-600 rounded-2xl shadow-2xl transition-all duration-300 transform translate-y-0">
-    <div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-green-200 bg-green-800 rounded-lg mr-3">
-      ✓
-    </div>
-    <div class="text-sm font-bold pr-2" id="toast-message">Data Transaksi Berhasil Disimpan!</div>
+  <!-- POPUP NOTIFIKASI (TOAST) -->
+  <div id="toast-notif" class="fixed top-5 right-5 z-50 hidden flex items-center p-4 mb-4 text-white rounded-2xl shadow-2xl transition-all duration-300">
+    <div id="toast-icon" class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg mr-3 font-bold">✓</div>
+    <div class="text-sm font-bold pr-2" id="toast-message">Notifikasi</div>
   </div>
 
   <!-- PAGE LOGIN -->
@@ -92,7 +90,7 @@
       <div class="max-w-7xl mx-auto px-4 flex gap-4 overflow-x-auto">
         <button onclick="switchTab('dashboard')" id="tab-dashboard" class="py-3 px-4 font-bold border-b-2 border-blue-600 text-blue-600 whitespace-nowrap">Dashboard</button>
         <button onclick="switchTab('input')" id="tab-input" class="py-3 px-4 font-bold border-b-2 border-transparent text-gray-500 whitespace-nowrap">Input Keuangan</button>
-        <button onclick="switchTab('rekap')" id="tab-rekap" class="py-3 px-4 font-bold border-b-2 border-transparent text-gray-500 whitespace-nowrap">Rekap Data</button>
+        <button onclick="switchTab('rekap')" id="tab-rekap" class="py-3 px-4 font-bold border-b-2 border-transparent text-gray-500 whitespace-nowrap">Rekap Data & Laporan</button>
       </div>
     </nav>
 
@@ -167,11 +165,11 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-gray-700">Foto Nota / Bukti</label>
+            <label class="block text-sm font-medium text-gray-700">Foto Nota / Bukti (Opsional)</label>
             <input type="file" id="input-foto" accept="image/*" class="mt-1 w-full p-2 border rounded-xl">
           </div>
 
-          <button type="submit" id="btn-submit-transaksi" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow transition duration-200">
+          <button type="submit" id="btn-submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow transition duration-200">
             Simpan Transaksi
           </button>
         </form>
@@ -190,8 +188,19 @@
           </div>
           <button onclick="renderTable()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold">Filter</button>
           <button onclick="cetakLaporanSuratResmi()" class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2">
-            🖨️ Cetak Laporan Resmi
+            🖨️ Cetak Laporan Resmi (A4)
           </button>
+        </div>
+
+        <!-- KOTAK INFORMASI SALDO BERSIH (SISA / MINUS) DI MENU REKAP -->
+        <div id="rekap-sisa-card" class="p-5 rounded-2xl shadow-sm border-2 transition-all bg-white flex items-center justify-between">
+          <div>
+            <p id="rekap-sisa-label" class="text-xs font-bold uppercase tracking-wider text-gray-500">Saldo Akhir (Sisa Uang / Netto)</p>
+            <h2 id="rekap-sisa-nominal" class="text-2xl font-extrabold text-gray-800">Rp 0</h2>
+          </div>
+          <div id="rekap-sisa-badge" class="px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600">
+            Normal
+          </div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border overflow-x-auto">
@@ -232,8 +241,6 @@
 
   <!-- AREA CETAK SURAT RESMI (A4) -->
   <div id="laporan-cetak" class="hidden bg-white text-black p-8 max-w-4xl mx-auto">
-    
-    <!-- KOP SURAT RESMI -->
     <div class="flex items-center justify-between border-b-4 border-black pb-4 mb-6">
       <img src="logo.jpeg" alt="Logo RADAR MART" class="h-20 w-auto object-contain">
       <div class="text-center flex-1 px-4">
@@ -244,15 +251,14 @@
       <div class="w-20"></div>
     </div>
 
-    <!-- JUDUL LAPORAN & INFORMASI PERIODE -->
     <div class="text-center mb-6">
       <h2 class="text-xl font-bold underline uppercase tracking-wider">LAPORAN REKAPITULASI KEUANGAN</h2>
       <p class="text-xs text-gray-600 mt-1">Periode Transaksi: <span id="surat-periode" class="font-semibold"></span></p>
       <p class="text-xs text-gray-600">Dicetak Pada: <span id="surat-tgl-cetak" class="font-semibold"></span></p>
     </div>
 
-    <!-- TABEL RINGKASAN TOTAL -->
-    <div class="grid grid-cols-3 gap-4 mb-6 text-xs text-center font-bold">
+    <!-- 3 RINGKASAN UTAMA DI CETAK A4 -->
+    <div class="grid grid-cols-3 gap-3 mb-4 text-xs text-center font-bold">
       <div class="border border-green-600 p-2 rounded bg-green-50">
         Total Pemasukan: <br><span id="surat-tot-masuk" class="text-sm text-green-700">Rp 0</span>
       </div>
@@ -264,7 +270,12 @@
       </div>
     </div>
 
-    <!-- TABEL DETAIL TRANSAKSI -->
+    <!-- KOTAK KETERANGAN SISA / MINUS DI CETAK A4 -->
+    <div class="border-2 border-black p-3 rounded mb-6 text-center bg-gray-50">
+      <p class="text-xs font-bold uppercase tracking-widest text-gray-700">Keterangan Saldo Bersih (Sisa / Minus Uang)</p>
+      <p id="surat-netto-text" class="text-lg font-extrabold mt-1">Rp 0</p>
+    </div>
+
     <table class="w-full text-xs text-left border-collapse border border-gray-400 mb-8">
       <thead>
         <tr class="bg-gray-200 border-b border-gray-400 text-gray-800">
@@ -280,7 +291,6 @@
       <tbody id="surat-items"></tbody>
     </table>
 
-    <!-- TANDA TANGAN PENANGGUNG JAWAB -->
     <div class="flex justify-between items-end mt-12 text-xs">
       <div class="text-center w-48">
         <p>Petugas Kasir,</p>
@@ -294,11 +304,9 @@
         <p class="font-bold underline">( RADAR MART )</p>
       </div>
     </div>
-
   </div>
 
   <script>
-    // Konfigurasi Firebase RADAR MART
     const firebaseConfig = {
       apiKey: "AIzaSyC9HAM8_ngWtpBcORwLKQDh5BjfIEnACWM",
       authDomain: "radar-mart-keuangan.firebaseapp.com",
@@ -321,13 +329,23 @@
       document.getElementById('input-datetime').value = now.toLocaleString('id-ID');
     }, 1000);
 
-    function showToast(msg) {
+    function showToast(msg, isError = false) {
       const toast = document.getElementById('toast-notif');
+      const icon = document.getElementById('toast-icon');
       document.getElementById('toast-message').innerText = msg;
+      
+      if(isError) {
+        toast.className = "fixed top-5 right-5 z-50 flex items-center p-4 mb-4 text-white bg-red-600 rounded-2xl shadow-2xl transition-all duration-300";
+        icon.className = "inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg mr-3 font-bold bg-red-800 text-red-200";
+        icon.innerText = "✕";
+      } else {
+        toast.className = "fixed top-5 right-5 z-50 flex items-center p-4 mb-4 text-white bg-green-600 rounded-2xl shadow-2xl transition-all duration-300";
+        icon.className = "inline-flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg mr-3 font-bold bg-green-800 text-green-200";
+        icon.innerText = "✓";
+      }
+
       toast.classList.remove('hidden');
-      setTimeout(() => {
-        toast.classList.add('hidden');
-      }, 3000);
+      setTimeout(() => { toast.classList.add('hidden'); }, 3500);
     }
 
     auth.onAuthStateChanged(user => {
@@ -368,9 +386,9 @@
     async function saveTransaction(e) {
       e.preventDefault();
       
-      const submitBtn = document.getElementById('btn-submit-transaksi');
-      submitBtn.disabled = true;
-      submitBtn.innerText = "⏳ Menyimpan...";
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      btn.innerText = "Menyimpan ke Cloud Database...";
 
       try {
         const shift = document.getElementById('input-shift').value;
@@ -382,7 +400,7 @@
 
         let photoData = "";
         if (fileInput.files[0]) {
-          photoData = await convertBase64Fast(fileInput.files[0]);
+          photoData = await compressImage(fileInput.files[0]);
         }
 
         await db.collection("transactions").add({
@@ -390,38 +408,35 @@
           user, shift, jenis, nominal, keterangan, photoData
         });
 
-        // NOTIFIKASI TOAST INSTAN
-        showToast("✅ Transaksi Berhasil Disimpan!");
-        
+        showToast("Sukses! Data keuangan tersimpan permanen.");
         document.getElementById('form-transaksi').reset();
         switchTab('rekap');
-        loadData();
 
       } catch (error) {
-        alert("❌ Gagal menyimpan: " + error.message);
+        console.error("Gagal simpan:", error);
+        showToast("Gagal menyimpan! Periksa Rules Firebase / Koneksi.", true);
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.innerText = "Simpan Transaksi";
+        btn.disabled = false;
+        btn.innerText = "Simpan Transaksi";
       }
     }
 
-    // Kompresi Gambar Cepat Ringan
-    function convertBase64Fast(file) {
+    function compressImage(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
         const img = new Image();
         reader.readAsDataURL(file);
-        reader.onload = (event) => {
-          img.src = event.target.result;
+        reader.onload = (e) => {
+          img.src = e.target.result;
           img.onload = () => {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 500; // Ukuran diperkecil agar sangat ringan
+            const MAX_WIDTH = 400;
             const scale = MAX_WIDTH / img.width;
             canvas.width = (img.width > MAX_WIDTH) ? MAX_WIDTH : img.width;
             canvas.height = (img.width > MAX_WIDTH) ? img.height * scale : img.height;
             const ctx = canvas.getContext('2d');
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL('image/jpeg', 0.5));
+            resolve(canvas.toDataURL('image/jpeg', 0.4));
           };
         };
       });
@@ -432,6 +447,9 @@
         transactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         renderStats();
         renderTable();
+      }, error => {
+        console.error("Gagal memuat data dari database:", error);
+        showToast("Gagal memuat data database!", true);
       });
     }
 
@@ -477,7 +495,11 @@
         });
       }
 
+      let subMasuk = 0, subKeluar = 0;
       filtered.forEach(t => {
+        if (t.jenis === 'pemasukan') subMasuk += t.nominal;
+        if (t.jenis === 'pengeluaran') subKeluar += t.nominal;
+
         const tr = document.createElement('tr');
         tr.className = "border-b hover:bg-gray-50";
         tr.innerHTML = `
@@ -494,6 +516,36 @@
         `;
         tbody.appendChild(tr);
       });
+
+      // Hitung Sisa/Netto (Pemasukan - Pengeluaran) pada filter aktif
+      const selisih = subMasuk - subKeluar;
+      const card = document.getElementById('rekap-sisa-card');
+      const nominalEl = document.getElementById('rekap-sisa-nominal');
+      const badgeEl = document.getElementById('rekap-sisa-badge');
+      const labelEl = document.getElementById('rekap-sisa-label');
+
+      if (selisih > 0) {
+        card.className = "p-5 rounded-2xl shadow-sm border-2 border-green-500 bg-green-50 flex items-center justify-between";
+        labelEl.innerText = "Sisa Uang Bersih (Surplus / Untung)";
+        nominalEl.className = "text-2xl font-extrabold text-green-700";
+        nominalEl.innerText = `+ Rp ${selisih.toLocaleString('id-ID')}`;
+        badgeEl.className = "px-4 py-2 rounded-xl text-xs font-bold bg-green-200 text-green-800";
+        badgeEl.innerText = "SURPLUS (SISA)";
+      } else if (selisih < 0) {
+        card.className = "p-5 rounded-2xl shadow-sm border-2 border-red-500 bg-red-50 flex items-center justify-between";
+        labelEl.innerText = "Uang Minus (Defisit / Rugi)";
+        nominalEl.className = "text-2xl font-extrabold text-red-700";
+        nominalEl.innerText = `- Rp ${Math.abs(selisih).toLocaleString('id-ID')}`;
+        badgeEl.className = "px-4 py-2 rounded-xl text-xs font-bold bg-red-200 text-red-800";
+        badgeEl.innerText = "MINUS (DEFISIT)";
+      } else {
+        card.className = "p-5 rounded-2xl shadow-sm border-2 border-gray-300 bg-white flex items-center justify-between";
+        labelEl.innerText = "Saldo Akhir (Sisa Uang / Netto)";
+        nominalEl.className = "text-2xl font-extrabold text-gray-800";
+        nominalEl.innerText = `Rp 0`;
+        badgeEl.className = "px-4 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600";
+        badgeEl.innerText = "SEIMBANG";
+      }
     }
 
     function viewNota(id) {
@@ -511,8 +563,7 @@
     async function deleteData(id) {
       if (confirm("Yakin ingin menghapus data ini?")) {
         await db.collection("transactions").doc(id).delete();
-        showToast("🗑️ Data Berhasil Dihapus");
-        loadData();
+        showToast("Data Berhasil Dihapus");
       }
     }
 
@@ -574,6 +625,20 @@
       document.getElementById('surat-tot-masuk').innerText = `Rp ${totMasuk.toLocaleString('id-ID')}`;
       document.getElementById('surat-tot-keluar').innerText = `Rp ${totKeluar.toLocaleString('id-ID')}`;
       document.getElementById('surat-tot-hutang').innerText = `Rp ${totHutang.toLocaleString('id-ID')}`;
+
+      // Hitung selisih netto untuk surat cetak A4
+      const selisihNetto = totMasuk - totKeluar;
+      const nettoTextEl = document.getElementById('surat-netto-text');
+      if (selisihNetto > 0) {
+        nettoTextEl.className = "text-lg font-extrabold mt-1 text-green-700";
+        nettoTextEl.innerText = `SISA UANG BERSIH (SURPLUS): + Rp ${selisihNetto.toLocaleString('id-ID')}`;
+      } else if (selisihNetto < 0) {
+        nettoTextEl.className = "text-lg font-extrabold mt-1 text-red-700";
+        nettoTextEl.innerText = `UANG MINUS (DEFISIT): - Rp ${Math.abs(selisihNetto.toLocaleString('id-ID'))}`;
+      } else {
+        nettoTextEl.className = "text-lg font-extrabold mt-1 text-gray-800";
+        nettoTextEl.innerText = `SALDO BERSIH: Rp 0 (SEIMBANG)`;
+      }
 
       document.getElementById('laporan-cetak').classList.remove('hidden');
       window.print();
